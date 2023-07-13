@@ -4,6 +4,8 @@ from scipy.ndimage import rotate
 from PIL import Image
 from utils import image_shape, DRIVE_files, STARE_files, random_perturbation
 import cv2
+import multiprocessing as mp
+from functools import partial
 
 
 # M: Can't get rid of Image.open because cv2.imread does not support .gif images,
@@ -21,6 +23,71 @@ def pad_imgs(imgs, img_size):
     (target_w - img_w) // 2:(target_w - img_w) // 2 + img_w, ...] = imgs
 
     return padded
+
+
+def gen_one_image(index, img_files, vessel_files, mask_files, img_size, img_dir, vessel_dir, mask_dir, step_size, img_set):
+    img_filename = img_files[index]
+    vessel_filename = vessel_files[index]
+    mask_filename = mask_files[index]
+    count = 0
+
+    set_img = np.asarray(Image.open(img_filename)).astype(np.float32)
+    set_img = pad_imgs(set_img, img_size)
+    cv2.imwrite(
+        os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count)),
+        cv2.cvtColor(np.float32(set_img), cv2.COLOR_RGB2BGR)
+    )
+
+    set_vessel = np.asarray(Image.open(vessel_filename)).astype(int)
+    set_vessel = pad_imgs(set_vessel, img_size)
+    cv2.imwrite(
+        os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count)),
+        set_vessel
+    )
+
+    set_mask = np.asarray(Image.open(mask_filename)).astype(int)
+    set_mask = pad_imgs(set_mask, img_size)
+    cv2.imwrite(
+        os.path.join(mask_dir, "{:05}.png".format(index + 1)),
+        set_mask
+    )
+
+
+    count += 1
+    if img_set == "training": #only augment training data
+        # augment the original image (flip, rotate)
+
+        flipped_img = set_img[:, ::-1, :]
+        flipped_vessel = set_vessel[:, ::-1]
+        cv2.imwrite(
+            os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count)),
+            cv2.cvtColor(np.float32(flipped_img), cv2.COLOR_RGB2BGR)
+        )
+        cv2.imwrite(
+            os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count)),
+            flipped_vessel
+        )
+        count += 1
+        for angle in range(step_size, 360, step_size):
+            cv2.imwrite(
+                os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count)),
+                rotate(set_vessel, angle, axes=(0, 1), reshape=False)
+            )
+            cv2.imwrite(
+                os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count + 1)),
+                rotate(flipped_vessel, angle, axes=(0, 1), reshape=False)
+            )
+            cv2.imwrite(
+                os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count)),
+                cv2.cvtColor(np.float32(random_perturbation(rotate(set_img, angle, axes=(0, 1), reshape=False))),
+                             cv2.COLOR_RGB2BGR)
+            )
+            cv2.imwrite(
+                os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count + 1)),
+                cv2.cvtColor(np.float32(random_perturbation(rotate(flipped_img, angle, axes=(0, 1), reshape=False))),
+                             cv2.COLOR_RGB2BGR)
+            )
+            count += 2
 
 
 def gen_data(run: dict):
@@ -63,70 +130,14 @@ def gen_data(run: dict):
             img_files, vessel_files, mask_files = STARE_files(src_dir)
 
         img_size = (640, 640) if dataset == 'DRIVE' else (720, 720)
+        
+        pool = mp.Pool(mp.cpu_count())
+        
+        partial_process_item = partial(gen_one_image, img_files=img_files, vessel_files=vessel_files, mask_files=mask_files, img_size=img_size, img_dir=img_dir, vessel_dir=vessel_dir, mask_dir=mask_dir, step_size=step_size, img_set=img_set)
+        pool.map(partial_process_item, range(len(img_files)))
 
-        for index in range(len(img_files)):
-            print(f"generating [{index+1}/{len(img_files)}]")
-            img_filename = img_files[index]
-            vessel_filename = vessel_files[index]
-            mask_filename = mask_files[index]
-            count = 0
-
-            set_img = np.asarray(Image.open(img_filename)).astype(np.float32)
-            set_img = pad_imgs(set_img, img_size)
-            cv2.imwrite(
-                os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count)),
-                cv2.cvtColor(np.float32(set_img), cv2.COLOR_RGB2BGR)
-            )
-
-            set_vessel = np.asarray(Image.open(vessel_filename)).astype(int)
-            set_vessel = pad_imgs(set_vessel, img_size)
-            cv2.imwrite(
-                os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count)),
-                set_vessel
-            )
-
-            set_mask = np.asarray(Image.open(mask_filename)).astype(int)
-            set_mask = pad_imgs(set_mask, img_size)
-            cv2.imwrite(
-                os.path.join(mask_dir, "{:05}.png".format(index + 1)),
-                set_mask
-            )
-
-
-            count += 1
-            if img_set == "training": #only augment training data
-                # augment the original image (flip, rotate)
-
-                flipped_img = set_img[:, ::-1, :]
-                flipped_vessel = set_vessel[:, ::-1]
-                cv2.imwrite(
-                    os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count)),
-                    cv2.cvtColor(np.float32(flipped_img), cv2.COLOR_RGB2BGR)
-                )
-                cv2.imwrite(
-                    os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count)),
-                    flipped_vessel
-                )
-                count += 1
-                for angle in range(step_size, 360, step_size):
-                    cv2.imwrite(
-                        os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count)),
-                        rotate(set_vessel, angle, axes=(0, 1), reshape=False)
-                    )
-                    cv2.imwrite(
-                        os.path.join(vessel_dir, "{:05}_{:03}.png".format(index + 1, count + 1)),
-                        rotate(flipped_vessel, angle, axes=(0, 1), reshape=False)
-                    )
-                    cv2.imwrite(
-                        os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count)),
-                        cv2.cvtColor(np.float32(random_perturbation(rotate(set_img, angle, axes=(0, 1), reshape=False))),
-                                     cv2.COLOR_RGB2BGR)
-                    )
-                    cv2.imwrite(
-                        os.path.join(img_dir, "{:05}_{:03}.png".format(index + 1, count + 1)),
-                        cv2.cvtColor(np.float32(random_perturbation(rotate(flipped_img, angle, axes=(0, 1), reshape=False))),
-                                     cv2.COLOR_RGB2BGR)
-                    )
-                    count += 2
+        pool.close()
+        pool.join()
+        
 
     return img_out_dir
