@@ -120,7 +120,7 @@ def train(run, img_src_dir):
     os.environ['CUDA_VISIBLE_DEVICES'] = "0"
     ratio_gan2seg = 1
     discriminator = "image"
-    n_rounds = 10
+    n_rounds = run['n_rounds']
     batch_size = 2
     n_filters_d = 32
     n_filters_g = 32
@@ -138,12 +138,12 @@ def train(run, img_src_dir):
     # set dataset
     dataset = run['dataset']
     rotation = run['data_rotation']
-    runs_dir = os.path.join("runs",run['model'],datetime.today().strftime('%Y-%m-%d_%H_%M'))
+    runs_dir = os.path.join("runs", run['model'], "{}_{}_{}".format(dataset, rotation, n_rounds), datetime.today().strftime('%Y-%m-%d_%H_%M'))
     img_size = (640, 640) if dataset == 'DRIVE' else (720, 720)
-    img_out_dir = os.path.join(runs_dir, "{}_{}/segmentation_results_{}_{}".format(dataset, rotation, discriminator,
+    img_out_dir = os.path.join(runs_dir, "segmentation_results_{}_{}".format(discriminator,
                                                                                    ratio_gan2seg))
-    model_out_dir = os.path.join(runs_dir, "{}_{}/model_{}_{}".format(dataset, rotation, discriminator, ratio_gan2seg))
-    auc_out_dir = os.path.join(runs_dir, "{}_{}/auc_{}_{}".format(dataset, rotation, discriminator, ratio_gan2seg))
+    model_out_dir = os.path.join(runs_dir, "model_{}_{}".format(discriminator, ratio_gan2seg))
+    auc_out_dir = os.path.join(runs_dir, "auc_{}_{}".format(discriminator, ratio_gan2seg))
     train_dir = os.path.join(img_src_dir, "training")
     test_dir = os.path.join(img_src_dir, "test")
     if not os.path.isdir(runs_dir):
