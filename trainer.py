@@ -138,7 +138,12 @@ def train(run, img_src_dir):
     # set dataset
     dataset = run['dataset']
     rotation = run['data_rotation']
-    runs_dir = os.path.join("runs", run['model'], "{}_{}_{}".format(dataset, rotation, n_rounds), datetime.today().strftime('%Y-%m-%d_%H_%M'))
+    if run['model'] == 'growing':
+        runs_dir = os.path.join("runs", run['model'], "{}_{}_{}_{}".format(dataset, rotation, n_rounds, run['grow_round_multiplier']), datetime.today().strftime('%Y-%m-%d_%H_%M'))
+    else:
+        runs_dir = os.path.join("runs", run['model'],
+                                "{}_{}_{}".format(dataset, rotation, n_rounds),
+                                datetime.today().strftime('%Y-%m-%d_%H_%M'))
     img_size = (640, 640) if dataset == 'DRIVE' else (720, 720)
     img_out_dir = os.path.join(runs_dir, "segmentation_results_{}_{}".format(discriminator,
                                                                                    ratio_gan2seg))
@@ -370,7 +375,13 @@ def train(run, img_src_dir):
                                         init_lr) if alpha_recip > 0 else utils.Scheduler(0, n_train_imgs // batch_size,
                                                                                          schedules, init_lr)
             print("training {} images :".format(n_train_imgs))
-            for n_round in range(n_rounds):
+            # M: multiplier for number of rounds
+            if run['grow_round_multiplier'] > 0:
+                t_rounds = n_rounds * (run['grow_round_multiplier'] * (5-growing_epoch))
+            else:
+                t_rounds = n_rounds
+            rounds_for_evaluation = range(t_rounds)
+            for n_round in range(t_rounds):
                 print_time("Start training round " + str(n_round))
                 print("Growing epoch: {}\nImage size: {}\n".format(growing_epoch, new_img_size))
                 # train D
