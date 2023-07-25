@@ -382,7 +382,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
         print("training {} images :".format(n_train_imgs))
         # M: number of training rounds used for a specific growing epoch
         if type(n_rounds) == list:
-            t_rounds = n_rounds[min(growing_epoch-1, len(n_rounds))]
+            t_rounds = n_rounds[growing_epoch-1]
         else:
             t_rounds = n_rounds
         rounds_for_evaluation = range(t_rounds)
