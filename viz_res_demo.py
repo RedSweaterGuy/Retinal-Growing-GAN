@@ -14,14 +14,14 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 show_titles = True
 rotate_by = 0
 query_ground_truth = True
-_cmap = "viridis"
+_cmap = "gray"
 
 
 # maybe change this later
 custom_colors = [
     "black",  # Black if image1 == image2 and image1 == 0
     "white",  # White if image1 == image2 and image1 == 1
-    "magenta",  # Red for image1 > image2
+    "orange",  # Red for image1 > image2
     "red"  # Green for image2 > image1
 ]
 # Create the custom colormap
