@@ -1,5 +1,3 @@
-
-data/DRIVE_180/
-data/DRIVE_90/
-data/DRIVE_36/
-data/DRIVE_3/
+data/
+logs/
+runs/
