@@ -7,6 +7,8 @@ from PIL import Image
 from keras import backend as K
 from datetime import datetime
 from skimage.transform import downscale_local_mean
+import tensorflow as tf
+import random
 
 
 def print_time(text):
@@ -22,8 +24,8 @@ def train_original(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip
     rounds_for_evaluation = range(n_rounds)
     # set directories
     runs_dir = os.path.join("runs", run['model'],
-                            "{}_{}_{}".format(dataset, rotation, n_rounds),
-                            datetime.today().strftime('%Y-%m-%d_%H_%M'))
+                            "{}_{}_{} - {}".format(dataset, rotation, n_rounds,
+                            datetime.today().strftime('%Y-%m-%d_%H_%M')))
     img_size = (640, 640) if dataset == 'DRIVE' else (720, 720)
     img_out_dir = os.path.join(runs_dir, "segmentation_results_{}_{}".format(discriminator,
                                                                              ratio_gan2seg))
@@ -172,8 +174,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
 
     # set directories
     runs_dir = os.path.join("runs", run['model'],
-                            "{}_{}_{}".format(dataset, rotation, n_rounds),
-                            datetime.today().strftime('%Y-%m-%d_%H_%M'))
+                            "{}_{}_{} - {}".format(dataset, rotation, n_rounds, datetime.today().strftime('%Y-%m-%d_%H_%M')))
     img_size = (640, 640) if dataset == 'DRIVE' else (720, 720)
     img_out_dir = os.path.join(runs_dir, "segmentation_results_{}_{}".format(discriminator,
                                                                              ratio_gan2seg))
@@ -184,8 +185,6 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
     test_dir = os.path.join(img_src_dir, "test")
     if not os.path.isdir(runs_dir):
         os.makedirs(runs_dir)
-    if not os.path.isdir(img_out_dir):
-        os.makedirs(img_out_dir)
     if not os.path.isdir(model_out_dir):
         os.makedirs(model_out_dir)
     if not os.path.isdir(auc_out_dir):
@@ -398,18 +397,16 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
 
 
 def train(run, img_src_dir):
+    tf.random.set_seed(random.randint(0, 10**10))
     # training settings
     os.environ['CUDA_VISIBLE_DEVICES'] = "0"
     ratio_gan2seg = 1
     discriminator = "image"
-    n_rounds = run['n_rounds']
     batch_size = 2
     n_filters_d = 32
     n_filters_g = 32
     val_ratio = 0.05
     init_lr = 2e-4
-    # Number of workers for dataloader
-    workers = 4
     schedules = {'lr_decay': {},  # learning rate and step have the same decay schedule (not necessarily the values)
                  'step_decay': {}}
     alpha_recip = 1. / ratio_gan2seg if ratio_gan2seg > 0 else 0
@@ -418,7 +415,6 @@ def train(run, img_src_dir):
 
     if run['model'] == 'original':
         train_original(run, img_src_dir, batch_size,val_ratio, init_lr, alpha_recip, schedules, n_filters_g, n_filters_d, discriminator, ratio_gan2seg)
-
-    if run['model'] == 'growing':
+    elif run['model'] == 'growing':
         train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip, schedules, n_filters_g, n_filters_d, discriminator, ratio_gan2seg)
 

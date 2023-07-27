@@ -7,7 +7,4 @@ pillow==9.2.0
 scipy==1.9.1
 scikit-image==0.19.2
 scikit-learn==1.0.2
-opencv-python==4.8.0.74
-torch==2.0.0+cu118
-torchvision==0.15.1+cu118
 future==0.18.2
