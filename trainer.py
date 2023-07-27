@@ -130,6 +130,7 @@ def train_original(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip
                                                                              ratio_gan2seg))
     model_out_dir = os.path.join(runs_dir, "model_{}_{}".format(discriminator, ratio_gan2seg))
     auc_out_dir = os.path.join(runs_dir, "auc_{}_{}".format(discriminator, ratio_gan2seg))
+    timings_out = os.path.join(runs_dir, "timings.csv")
     train_dir = os.path.join(img_src_dir, "training")
     test_dir = os.path.join(img_src_dir, "test")
     if not os.path.isdir(runs_dir):
@@ -140,20 +141,32 @@ def train_original(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip
         os.makedirs(model_out_dir)
     if not os.path.isdir(auc_out_dir):
         os.makedirs(auc_out_dir)
+    if not os.path.isfile(timings_out):
+        timings = open(timings_out, "w")
+        timings.write("Comment,time elapsed (s)\n")
 
     # set training and validation dataset
+    start_time_whole = datetime.now()
     train_imgs, train_vessels = utils.get_imgs(train_dir, augmentation=True, img_size=img_size, dataset=dataset)
     train_vessels = np.expand_dims(train_vessels, axis=3)
     n_all_imgs = train_imgs.shape[0]
     n_train_imgs = int((1 - val_ratio) * n_all_imgs)
+
+    # set test dataset
+    test_imgs, test_vessels, test_masks = utils.get_imgs(test_dir, augmentation=False, img_size=img_size,
+                                                         dataset=dataset, mask=True)
+    end_time = datetime.now()
+    timings.write(f"retrieved training and test images,{(end_time - start_time_whole).total_seconds()}\n")
+
+    start_time = datetime.now()
     train_indices = np.random.choice(n_all_imgs, n_train_imgs, replace=False)
     train_batch_fetcher = utils.TrainBatchFetcher(train_imgs[train_indices, ...], train_vessels[train_indices, ...],
                                                   batch_size)
     val_imgs, val_vessels = train_imgs[np.delete(range(n_all_imgs), train_indices), ...], train_vessels[
         np.delete(range(n_all_imgs), train_indices), ...]
-    # set test dataset
-    test_imgs, test_vessels, test_masks = utils.get_imgs(test_dir, augmentation=False, img_size=img_size,
-                                                         dataset=dataset, mask=True)
+    end_time = datetime.now()
+    timings.write(f"sampling of images,{(end_time - start_time).total_seconds()}\n")
+
     # create networks
     g = model.generator(img_size, n_filters_g)
 
@@ -183,6 +196,7 @@ def train_original(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip
                                 init_lr) if alpha_recip > 0 else utils.Scheduler(0, n_train_imgs // batch_size,
                                                                                  schedules, init_lr)
     print("training {} images :".format(n_train_imgs))
+    start_time = datetime.now()
     for n_round in range(n_rounds):
         print_time("Start training round " + str(n_round + 1))
 
@@ -244,6 +258,12 @@ def train_original(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip
                 Image.fromarray((segmented_vessel[index, :, :] * 255).astype(np.uint8)).save(
                     os.path.join(img_out_dir, str(n_round) + "_{:02}_segmented.png".format(index + 1)))
 
+    end_time_whole = datetime.now()
+    timings.write(f"training with {n_rounds} rounds done,{(end_time_whole - start_time).total_seconds()}\n")
+    timings.write(
+        f"total time elapsed,{(end_time_whole - start_time_whole).total_seconds()}\n")
+    timings.close()
+
 
 def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip, schedules, n_filters_g, n_filters_d, discriminator, ratio_gan2seg):
     # set dataset
@@ -260,6 +280,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
                                                                              ratio_gan2seg))
     model_out_dir = os.path.join(runs_dir, "model_{}_{}".format(discriminator, ratio_gan2seg))
     auc_out_dir = os.path.join(runs_dir, "auc_{}_{}".format(discriminator, ratio_gan2seg))
+    timings_out = os.path.join(runs_dir, "timings.csv")
     train_dir = os.path.join(img_src_dir, "training")
     test_dir = os.path.join(img_src_dir, "test")
     if not os.path.isdir(runs_dir):
@@ -270,6 +291,9 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
         os.makedirs(model_out_dir)
     if not os.path.isdir(auc_out_dir):
         os.makedirs(auc_out_dir)
+    if not os.path.isfile(timings_out):
+        timings = open(timings_out, "w")
+        timings.write("Comment,time elapsed (s)\n")
     if not os.path.isdir(img_out_dir + "_1"):
         os.makedirs(img_out_dir + "_1")
     if not os.path.isdir(img_out_dir + "_2"):
@@ -281,6 +305,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
 
     img_height, img_width = img_size[0], img_size[1]
     # set training and validation dataset
+    start_time_whole = datetime.now()
     train_imgs_orig, train_vessels_orig = utils.get_imgs(train_dir, augmentation=True, img_size=img_size,
                                                          dataset=dataset)
     n_all_imgs = train_imgs_orig.shape[0]
@@ -290,6 +315,8 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
     test_imgs_orig, test_vessels_orig, test_masks_orig = utils.get_imgs(test_dir, augmentation=False,
                                                                         img_size=img_size,
                                                                         dataset=dataset, mask=True)
+    end_time = datetime.now()
+    timings.write(f"retrieved training and test images,{(end_time-start_time_whole).total_seconds()}\n")
 
     # for 80 80 to 640 640, only for DRIVE, for now
     growing_epochs = [1, 2, 3, 4]
@@ -299,6 +326,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
     d_old = None
 
     for growing_epoch in growing_epochs:
+        start_time_growing_epoch = datetime.now()
         print_time("Start of epoch, downsampling images " + str(growing_epoch))
         ds_factor = 2 ** (4 - growing_epoch)
         new_img_size = (img_height // ds_factor, img_width // ds_factor)
@@ -322,7 +350,8 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
                                                       train_vessels[train_indices, ...], batch_size)
         val_imgs, val_vessels = train_imgs[np.delete(range(n_all_imgs), train_indices), ...], train_vessels[
             np.delete(range(n_all_imgs), train_indices), ...]
-
+        end_time = datetime.now()
+        timings.write(f"downscaling and sampling of images,{(end_time - start_time_growing_epoch).total_seconds()}\n")
         # create networks
 
         if growing_epoch == 1:
@@ -354,6 +383,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
             d, d_out_shape = model.discriminator_dummy(new_img_size, n_filters_d, init_lr)
 
         if not g_old == None:
+            start_time = datetime.now()
             print_time("Start copying weights")
             print("Copying weights of these layers:")
 
@@ -364,6 +394,8 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
             for layer in d_old.layers[8:]:
                 print("\td:" + layer.name)
                 d.get_layer(layer.name).set_weights(layer.get_weights())
+            end_time = datetime.now()
+            timings.write(f"copying of weights,{(end_time - start_time).total_seconds()}\n")
 
         utils.make_trainable(d, False)
         gan = model.GAN(g, d, new_img_size, n_filters_g, n_filters_d, alpha_recip, init_lr)
@@ -386,6 +418,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
         else:
             t_rounds = n_rounds
         rounds_for_evaluation = range(t_rounds)
+        start_time = datetime.now()
         for n_round in range(t_rounds):
             print_time("Start training round " + str(n_round))
             print("Growing epoch: {}\nImage size: {}\n".format(growing_epoch, new_img_size))
@@ -450,9 +483,19 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
                         os.path.join(img_out_dir + "_" + str(growing_epoch),
                                      "{:02}".format(n_round + 1) + "_{:02}_segmented.png".format(index + 1)))
 
+        end_time = datetime.now()
+        timings.write(f"training in growing epoch {growing_epoch} with {t_rounds} rounds,{(end_time - start_time).total_seconds()}\n")
         # save old generator and discriminator
         g_old = g
         d_old = d
+        end_time_epoch = datetime.now()
+        timings.write(
+            f"growing epoch {growing_epoch} done,{(end_time_epoch - start_time_growing_epoch).total_seconds()}\n")
+
+    end_time_whole = datetime.now()
+    timings.write(
+        f"total time elapsed,{(end_time_whole - start_time_whole).total_seconds()}\n")
+    timings.close()
 
 
 def train(run, img_src_dir):
