@@ -7,9 +7,7 @@ import tkinter as tk
 from tkinter import filedialog
 from skimage.transform import resize
 from skimage.morphology import dilation
-from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-from matplotlib.colorbar import ColorbarBase
-import palettable
+from matplotlib.colors import ListedColormap
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
