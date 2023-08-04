@@ -48,14 +48,14 @@ def train_original(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip
 
     # set training and validation dataset
     start_time_whole = datetime.now()
-    train_imgs, train_vessels = utils.get_imgs(train_dir, augmentation=True, img_size=img_size, dataset=dataset)
+    train_imgs, train_vessels = utils.get_imgs(train_dir, augmentation=True, img_size=img_size, dataset=dataset, rotation=rotation)
     train_vessels = np.expand_dims(train_vessels, axis=3)
     n_all_imgs = train_imgs.shape[0]
     n_train_imgs = int((1 - val_ratio) * n_all_imgs)
 
     # set test dataset
     test_imgs, test_vessels, test_masks = utils.get_imgs(test_dir, augmentation=False, img_size=img_size,
-                                                         dataset=dataset, mask=True)
+                                                         dataset=dataset, mask=True, rotation=rotation)
     end_time = datetime.now()
     timings.write(f"retrieved training and test images,{(end_time - start_time_whole).total_seconds()}\n")
 
@@ -205,13 +205,13 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
     # set training and validation dataset
     start_time_whole = datetime.now()
     train_imgs_orig, train_vessels_orig = utils.get_imgs(train_dir, augmentation=True, img_size=img_size,
-                                                         dataset=dataset)
+                                                         dataset=dataset, rotation=rotation)
     n_all_imgs = train_imgs_orig.shape[0]
     train_vessels_orig = np.expand_dims(train_vessels_orig, axis=3)
     n_train_imgs = int((1 - val_ratio) * n_all_imgs)
     # set test dataset
     test_imgs_orig, test_vessels_orig, test_masks_orig = utils.get_imgs(test_dir, augmentation=False, img_size=img_size,
-                                                                        dataset=dataset, mask=True)
+                                                                        dataset=dataset, mask=True, rotation=rotation)
     end_time = datetime.now()
     timings.write(f"retrieved training and test images,{(end_time-start_time_whole).total_seconds()}\n")
 
@@ -317,7 +317,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
         rounds_for_evaluation = range(t_rounds)
         start_time = datetime.now()
         for n_round in range(t_rounds):
-            print_time("Start training round " + str(n_round))
+            print_time("Start training round " + str(n_round+1))
             print("Growing epoch: {}\nImage size: {}\n".format(growing_epoch, new_img_size))
             # train D
             utils.make_trainable(d, True)
