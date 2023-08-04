@@ -408,7 +408,7 @@ def random_perturbation(imgs):
     return imgs 
 
     
-def get_imgs(target_dir, augmentation, img_size, dataset, mask=False):
+def get_imgs(target_dir, augmentation, img_size, dataset, mask=False, rotation=3):
     
     if dataset == 'DRIVE' or dataset == 'DEMO':
         img_files, vessel_files, mask_files = DRIVE_files(target_dir)
@@ -435,7 +435,7 @@ def get_imgs(target_dir, augmentation, img_size, dataset, mask=False):
         flipped_vessels = vessel_imgs[:, :, ::-1]
         all_fundus_imgs.append(flipped_imgs)
         all_vessel_imgs.append(flipped_vessels)
-        for angle in range(180, 360, 180):  # rotated imgs 3~360
+        for angle in range(rotation, 360, rotation):  # rotated imgs 3~360
             all_fundus_imgs.append(random_perturbation(rotate(fundus_imgs, angle, axes=(1, 2), reshape=False)))
             all_fundus_imgs.append(random_perturbation(rotate(flipped_imgs, angle, axes=(1, 2), reshape=False)))
             all_vessel_imgs.append(rotate(vessel_imgs, angle, axes=(1, 2), reshape=False))

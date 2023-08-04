@@ -210,8 +210,7 @@ def train_growing(run, img_src_dir, batch_size, val_ratio, init_lr, alpha_recip,
     train_vessels_orig = np.expand_dims(train_vessels_orig, axis=3)
     n_train_imgs = int((1 - val_ratio) * n_all_imgs)
     # set test dataset
-    test_imgs_orig, test_vessels_orig, test_masks_orig = utils.get_imgs(test_dir, augmentation=False,
-                                                                        img_size=img_size,
+    test_imgs_orig, test_vessels_orig, test_masks_orig = utils.get_imgs(test_dir, augmentation=False, img_size=img_size,
                                                                         dataset=dataset, mask=True)
     end_time = datetime.now()
     timings.write(f"retrieved training and test images,{(end_time-start_time_whole).total_seconds()}\n")
