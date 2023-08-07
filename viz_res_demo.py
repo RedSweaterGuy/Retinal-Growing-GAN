@@ -7,7 +7,6 @@ import tkinter as tk
 from tkinter import filedialog
 from skimage.transform import resize
 from skimage.morphology import dilation
-from matplotlib.colors import ListedColormap
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -16,32 +15,10 @@ rotate_by = 0
 query_ground_truth = True
 _cmap = "gray"
 
-# maybe change this later
-custom_colors2 = [
-    (0, 0, 0),  # black
-    (140, 81, 10),  # brown
-    (191, 129, 45),
-    (223, 194, 125),
-    (246, 232, 195),
-    (255, 255, 255),  # white
-    (199, 234, 229),
-    (128, 205, 193),
-    (53, 151, 143),
-    (1, 102, 94)  # aquamarine
-]
-custom_colors1 = [
-    "black",  # Black if image1 == image2 and image1 == 0
-    "white",  # White if image1 == image2 and image1 == 1
-    "orange",  # Orange for image1 > image2
-    "red"  # Red for image2 > image1
-]
 custom_color_false_positive = (197, 27, 125)
 custom_color_false_negative = (77, 146, 33)
-custom_color_true_positive = (255,255,255)
-background_color = (0,0,0)
-
-# Create the custom colormap
-custom_cmap = ListedColormap([custom_color_false_positive, custom_color_true_positive, custom_color_false_negative])
+custom_color_true_positive = (255, 255, 255)
+background_color = (0, 0, 0)
 
 dataset = "DRIVE"
 methods = ['origGAN', 'growGAN', 'growGAN20']
@@ -51,6 +28,11 @@ img_size = (640, 640)
 f_model = "pretrained/{}/{}_best.json"
 f_weights = "pretrained/{}/{}_best.h5"
 batch_size = 1
+
+
+def apply_colors(color1, color2, values):
+    return (color1[0] * values + color2[0] * (1 - values)), (color1[1] * values + color2[1] * (1 - values)), (
+                color1[0] * values + color2[0] * (1 - values))
 
 
 def remain_in_mask(img, masks):
@@ -159,20 +141,33 @@ for i in range(len(methods)):
     grd = segmentations['ground_truth_img'].copy()
     _output = grd - fake
 
-    diff_img = np.zeros((_output.shape[0],_output.shape[1],3), dtype=int)
-    _output[np.logical_and(_output>0, _output<0.1)] = 0
-    _output[np.logical_and(_output<0, _output>-0.1)] = 0
+    diff_img = np.zeros((_output.shape[0], _output.shape[1], 3), dtype=int)
+    _output[np.logical_and(_output > 0, _output < 0.1)] = 0
+    _output[np.logical_and(_output < 0, _output > -0.1)] = 0
     aux = Image.fromarray(_output)
 
-    diff_img[_output<0,:] = np.transpose((197 * abs(_output[_output<0]),27 * abs(_output[_output<0]),125* abs(_output[_output<0])))
-    diff_img[_output>0,:] = np.transpose((custom_color_false_negative[0] * _output[_output > 0], custom_color_false_negative[1] * _output[_output > 0], custom_color_false_negative[2] * _output[_output > 0]))
-    diff_img[np.logical_and(_output==0,grd>0.1),:] = custom_color_true_positive
+    """
+    diff_img[_output < 0, :] = np.transpose((custom_color_false_positive[0] * abs(_output[_output < 0]),
+                                             custom_color_false_positive[1] * abs(_output[_output < 0]),
+                                             custom_color_false_positive[2] * abs(_output[_output < 0])))
+    """
+    diff_img[_output < 0, :] = np.transpose(
+        apply_colors(custom_color_false_positive, background_color, abs(_output[_output < 0])))
+
+    """
+    diff_img[_output > 0, :] = np.transpose((custom_color_false_negative[0] * _output[_output > 0],
+                                             custom_color_false_negative[1] * _output[_output > 0],
+                                             custom_color_false_negative[2] * _output[_output > 0]))
+    """
+    diff_img[_output > 0, :] = np.transpose(
+        apply_colors(custom_color_false_negative, background_color, abs(_output[_output > 0])))
+
+    diff_img[np.logical_and(_output == 0, grd > 0.1), :] = custom_color_true_positive
 
     orig_imgs = np.copy(orig_copy)
     axs[i + (1 * query_ground_truth)].set_facecolor(background_color)
 
     axs[i + (1 * query_ground_truth)].imshow(diff_img)
-
 
     if show_titles:
         axs[i + (1 * query_ground_truth)].set_title(f"Ground truth VS {titles[i]}")
