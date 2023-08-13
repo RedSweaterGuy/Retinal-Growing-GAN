@@ -21,8 +21,8 @@ custom_color_true_positive = (255, 255, 255)
 background_color = (0, 0, 0)
 
 dataset = "DRIVE"
-methods = ['origGAN', 'growGAN', 'growGAN20']
-titles = ['Original GAN', 'Growing GAN 10 rounds', 'Growing GAN 20 rounds']
+methods = ['origGANnew', 'growGANconstant', 'growGANvarying']
+titles = ['Original GAN', 'Growing GAN 5 rounds constant', 'Growing GAN 10,4,4,4 rounds']
 
 img_size = (640, 640)
 f_model = "pretrained/{}/{}_best.json"
