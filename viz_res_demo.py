@@ -17,8 +17,8 @@ _cmap = "gray"
 
 custom_color_false_positive = (197, 27, 125)
 custom_color_false_negative = (77, 146, 33)
-custom_color_true_positive = (255, 255, 255)
-background_color = (0, 0, 0)
+custom_color_true_positive = (0, 0, 0)#(255, 255, 255)
+background_color = (255, 255, 255)#(0, 0, 0)
 
 dataset = "DRIVE"
 methods = ['origGANnew', 'growGANconstant', 'growGANvarying']
@@ -132,7 +132,8 @@ for ax_s in axs:
     ax_s.set_yticks([])
 
 if query_ground_truth:
-    axs[0].imshow(ground_truth_img, cmap=_cmap)
+
+    axs[0].imshow(ground_truth_img, cmap='gray_r')
     if show_titles:
         axs[0].set_title("Ground truth")
 for i in range(len(methods)):
@@ -163,9 +164,10 @@ for i in range(len(methods)):
         apply_colors(custom_color_false_negative, background_color, abs(_output[_output > 0])))
 
     diff_img[np.logical_and(_output == 0, grd > 0.1), :] = custom_color_true_positive
+    diff_img[np.logical_and(_output == 0, grd <= 0.1), :] = background_color
 
     orig_imgs = np.copy(orig_copy)
-    axs[i + (1 * query_ground_truth)].set_facecolor(background_color)
+    axs[i + (1 * query_ground_truth)].set_facecolor('white')
 
     axs[i + (1 * query_ground_truth)].imshow(diff_img)
 
