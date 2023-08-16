@@ -1,4 +1,5 @@
-data/*
+data/DRIVE
+data/STARE
 logs/
 runs/
 .Rproj.user
