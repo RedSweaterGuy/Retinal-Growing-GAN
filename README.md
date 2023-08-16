@@ -22,5 +22,6 @@ The models produced and their weights can be found in ``model_image_1``
 
 
 ## Rerunning code
-Man führt die ``python main.py`` aus, der random seed ist schon gesetzt.
-Für andere Ergebnisse können die run Konfigurationen geändert oder der seed geändert werden.
+Make sure you have the DRIVE and STARE datasets in the ``data`` folder.
+Execute ``python main.py`` the random seed has already been set.
+Said seed can be changed within the script alongside other configuration changes for the runs themselves.
