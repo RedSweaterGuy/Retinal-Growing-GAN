@@ -3,5 +3,5 @@ data/STARE
 logs/
 runs/
 .Rproj.user
-.RData
-.Rhistory
+RetinaGANstats/.RData
+RetinaGANstats/.Rhistory
