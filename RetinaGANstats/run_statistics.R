@@ -1,6 +1,8 @@
 library(dplyr)
 #includes all runs made, so also those on an older hardware configuration
-df_all = data.frame(model=factor(c("original","original","original", "growingConst", "growingConst", "growingVar", "growingVar", "growingVar", "growingConst", "growingConst", "growingConst", "growingConst", "original")), 
+df_all = data.frame(model=factor(c("Original","Original","Original", 
+                                   "GrowingGAN (5R)", "GrowingGAN (5R)", "GrowingGAN (10,4,4,4R)", "GrowingGAN (10,4,4,4R)", "GrowingGAN (10,4,4,4R)", 
+                                   "GrowingGAN (5R)", "GrowingGAN (10R)", "GrowingGAN (10R)", "GrowingGAN (20R)", "original"),levels = c("Original", "GrowingGAN (10R)", "GrowingGAN (10,4,4,4R)","GrowingGAN (5R)")), 
                 rounds=factor(c("10", "10", "10", 
                          "5,5,5,5", "5,5,5,5", "10,4,4,4", "10,4,4,4", "10,4,4,4", "5,5,5,5", "10,10,10,10", "10,10,10,10", "20,20,20,20", "10")), 
                 date_of_execution = c("2023_08_10 23:08:34","2023_08_03 14:08:48", "2023_08_03 10:57:02",
@@ -18,7 +20,7 @@ df$rounds=factor(df$rounds)
 
 write.csv(df_all, "runs_all.csv", row.names = FALSE)
 write.csv(df, "runs_new.csv", row.names = FALSE)
-par(cex=1.5)
+par(cex=1.12)
 boxplot(df$acc~df$model, ylab="Accuracy", xlab="Training procedure")
 boxplot(df$acc~df$rounds, ylab="Accuracy", xlab="Number of rounds")
 df%>% group_by(rounds)%>%filter(acc == max(acc, na.rm=TRUE))
