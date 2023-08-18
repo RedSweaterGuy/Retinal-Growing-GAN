@@ -5,3 +5,5 @@ runs/
 .Rproj.user
 RetinaGANstats/.RData
 RetinaGANstats/.Rhistory
+.idea/
+__pycache__/
