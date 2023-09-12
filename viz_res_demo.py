@@ -1,5 +1,8 @@
 import numpy as np
 import os
+import json
+import glob
+from json import JSONEncoder
 from keras.models import model_from_json
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -10,6 +13,14 @@ from skimage.morphology import dilation
 
 methods = ['origGANnew', 'GrowConst10', 'growGANvarying', 'growGANconstant']
 img_size = (640, 640)
+
+
+class NumpyArrayEncoder(JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return JSONEncoder.default(self, obj)
+
 
 def create_img_fundus_segmentation_overlay(orig_img, cmap, ground_truth_img, cross):
     fig_poster, axes_poster = plt.subplots(1, 3, figsize=(15, 6))
@@ -88,27 +99,30 @@ def main():
     # ask for image
     # make segmentation with the three models
     # output results with matplotlib
-    models = load_models()
+    generate_with_models = False
+    generate_for_all = generate_with_models and False
+    models = load_models() if generate_with_models else None
 
-    def open_file_dialog():
-        image_path = filedialog.askopenfilename(title="Choose a Fundus Image")
-        if not image_path:
-            return
-        # prevents an empty tkinter window from appearing
-        root = tk.Tk()
-        root.withdraw()
-        root.title("")
+    def convert_to_np(data):
+        out = dict()
+        for key in data:
+            out[key] = dict()
+            for arr_key in data[key]:
+                out[key][arr_key] = np.asarray(data[key][arr_key])
+        return out
 
+
+    def load_images(image_path):
+        fparts = os.path.split(image_path)
+        with open(os.path.join(fparts[0], os.pardir, "json", f"{fparts[1].split('.')[0]}.json"), "r") as f:
+            data = convert_to_np(json.load(f))
+            return data['overlays'], data['segmentations'], data['diff_imgs']
+
+
+    def get_images(image_path):
+        overlays = dict()
         segmentations = dict()  # dict where all segmentations for one run will be stored
-        # first plot
-        figs, axs = plt.subplots(3, len(methods) + (1 * query_ground_truth), sharex=True, sharey=True)
-        for ax_s in axs:
-            for ax in ax_s:
-                ax.set_yticklabels([])
-                ax.set_xticklabels([])
-                ax.set_xticks([])
-                ax.set_yticks([])
-
+        diff_imgs = dict()
 
         img = Image.open(image_path)
         if rotate_by > 0:
@@ -134,29 +148,14 @@ def main():
         ground_truth_img = np.asarray(ground_truth_img).astype(np.float32) / 255
         ground_truth_img = resize(ground_truth_img, img_size)
         segmentations['ground_truth_img'] = ground_truth_img
-        axs[0, 0].imshow(ground_truth_img, cmap=_cmap)
-        axs[2, 0].imshow(ground_truth_img, cmap='gray_r')
-        if show_titles:
-            axs[2,0].set_title("Ground truth")
 
-        # Uncomment to create the image of the poster, with fundus image, segmentation and overlay
-        #create_img_fundus_segmentation_overlay(orig_imgs[0], _cmap, ground_truth_img, cross)
-
-        axs[1, 0].imshow(remain_in_mask(orig_imgs[0], multi_dilation(ground_truth_img, cross, 4)), cmap=_cmap)
-        if show_titles:
-            axs[0, 0].set_title("Ground truth")
-
+        overlays['ground_truth'] = remain_in_mask(orig_imgs[0], multi_dilation(ground_truth_img, cross, 4))
         for i in range(len(methods)):
             generated = models[i].predict(test_imgs, batch_size=batch_size)
             generated = np.squeeze(generated, axis=3)[0]
             segmentations[methods[i]] = generated
-            axs[0, i + (1 * query_ground_truth)].imshow(generated, cmap=_cmap)
             orig_imgs = np.copy(orig_copy)
-            axs[1, i + (1 * query_ground_truth)].imshow(remain_in_mask(orig_imgs[0], multi_dilation(generated, cross, 4)),
-                                                        cmap=_cmap)
-
-            if show_titles:
-                axs[0, i + (1 * query_ground_truth)].set_title(titles[i])
+            overlays[methods[i]] = remain_in_mask(orig_imgs[0], multi_dilation(generated, cross, 4))
 
             fake = segmentations[methods[i]].copy()
             grd = segmentations['ground_truth_img'].copy()
@@ -175,9 +174,68 @@ def main():
             diff_img[np.logical_and(_output == 0, grd > 0.1), :] = custom_color_true_positive
             diff_img[np.logical_and(_output == 0, grd <= 0.1), :] = background_color
 
+            diff_imgs[methods[i]] = diff_img
+
+        fparts = os.path.split(image_path)
+        data = dict()
+        data["overlays"] = overlays
+        data["segmentations"] = segmentations
+        data["diff_imgs"] = diff_imgs
+        json_folder = os.path.join(fparts[0], os.pardir, "json")
+        if not os.path.exists(json_folder):
+            os.makedirs(json_folder, exist_ok=True)
+        with open(os.path.join(json_folder, f"{fparts[1].split('.')[0]}.json"), "w") as f:
+            json.dump(data, f, cls=NumpyArrayEncoder)
+
+        return overlays, segmentations, diff_imgs
+
+
+    def open_file_dialog():
+        image_path = filedialog.askopenfilename(title="Choose a Fundus Image")
+        if not image_path:
+            return
+        # prevents an empty tkinter window from appearing
+        root = tk.Tk()
+        root.withdraw()
+        root.title("")
+
+        # first plot
+        figs, axs = plt.subplots(3, len(methods) + (1 * query_ground_truth), sharex=True, sharey=True)
+        for ax in axs.ravel():
+            ax.set_yticklabels([])
+            ax.set_xticklabels([])
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+
+        if generate_for_all:
+            fparts = os.path.split(image_path)
+            for f in glob.glob(os.path.join(fparts[0], "*.tif")):
+                get_images(f)
+        overlays, segmentations, diff_imgs = load_images(image_path) if models is None else get_images(image_path)
+
+        axs[0, 0].imshow(segmentations['ground_truth_img'], cmap=_cmap)
+        axs[2, 0].imshow(segmentations['ground_truth_img'], cmap='gray_r')
+        if show_titles:
+            axs[2,0].set_title("Ground truth")
+
+        # Uncomment to create the image of the poster, with fundus image, segmentation and overlay
+        #create_img_fundus_segmentation_overlay(orig_imgs[0], _cmap, ground_truth_img, cross)
+
+        axs[1, 0].imshow(overlays['ground_truth'], cmap=_cmap)
+        if show_titles:
+            axs[0, 0].set_title("Ground truth")
+
+        for i in range(len(methods)):
+            axs[0, i + (1 * query_ground_truth)].imshow(segmentations[methods[i]], cmap=_cmap)
+            axs[1, i + (1 * query_ground_truth)].imshow(overlays[methods[i]], cmap=_cmap)
+
+            if show_titles:
+                axs[0, i + (1 * query_ground_truth)].set_title(titles[i])
+
             axs[2, i + (1 * query_ground_truth)].set_facecolor('white')
 
-            axs[2, i + (1 * query_ground_truth)].imshow(diff_img)
+            axs[2, i + (1 * query_ground_truth)].imshow(diff_imgs[methods[i]])
 
             if show_titles:
                 axs[2, i + (1 * query_ground_truth)].set_title(f"Ground truth VS {titles[i]}")
