@@ -1,5 +1,6 @@
 # VCBM-Growing-GAN
-
+![Fundus_Segmentation_Overlay](for_poster.png)
+![GrowGANArchitecture](GrowGANarchitecture.drawio.png)
 ## Requirements
 * We used a Windows system (10 Pro 64 bit), with 64 GB of RAM and an Nvidia RTX 3090.
 * We recommend to use at least 64 GB of RAM and a modern GPU with VRAM of 24 GB or more.
