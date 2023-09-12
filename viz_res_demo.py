@@ -8,31 +8,34 @@ from tkinter import filedialog
 from skimage.transform import resize
 from skimage.morphology import dilation
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
-show_titles = True
-rotate_by = 0
-query_ground_truth = True
-_cmap = "gray"
-
-custom_color_false_positive = (197, 27, 125)
-custom_color_false_negative = (77, 146, 33)
-custom_color_true_positive = (0, 0, 0)#(255, 255, 255)
-background_color = (255, 255, 255)#(0, 0, 0)
-
-dataset = "DRIVE"
-methods = ['origGANnew', 'GrowConst10', 'growGANvarying','growGANconstant']
-titles = ['Original GAN','GrowingGAN (10R)', 'GrowingGAN (10,4,4,4R)', 'GrowingGAN (5R)']
-
+methods = ['origGANnew', 'GrowConst10', 'growGANvarying', 'growGANconstant']
 img_size = (640, 640)
-f_model = "pretrained/{}/{}_best.json"
-f_weights = "pretrained/{}/{}_best.h5"
-batch_size = 1
+
+def create_img_fundus_segmentation_overlay(orig_img, cmap, ground_truth_img, cross):
+    fig_poster, axes_poster = plt.subplots(1, 3, figsize=(15, 6))
+    ax_poster = axes_poster[0]
+    ax_poster.imshow(orig_img)
+    ax_poster.text(0.5, -0.1, "Fundus", transform=ax_poster.transAxes, ha='center', fontsize=24)
+    ax_poster.axis('off')
+
+    ax_poster = axes_poster[1]
+    ax_poster.imshow(ground_truth_img, cmap=cmap)
+    ax_poster.text(0.5, -0.1, "Segmentation", transform=ax_poster.transAxes, ha='center', fontsize=24)
+    ax_poster.axis('off')
+
+    ax_poster = axes_poster[2]
+    ax_poster.imshow(remain_in_mask(orig_img, multi_dilation(ground_truth_img, cross, 4)), cmap=cmap)
+    ax_poster.text(0.5, -0.1, "Overlay", transform=ax_poster.transAxes, ha='center', fontsize=24)
+    ax_poster.axis('off')
+
+    plt.tight_layout()
+    plt.savefig("for_poster.png")
+    plt.close()
 
 
 def apply_colors(color1, color2, values):
     return (color1[0] * values + color2[0] * (1 - values)), (color1[1] * values + color2[1] * (1 - values)), (
-                color1[0] * values + color2[0] * (1 - values))
+            color1[0] * values + color2[0] * (1 - values))
 
 
 def remain_in_mask(img, masks):
@@ -46,132 +49,156 @@ def multi_dilation(image, kernel, iterations):
     return image
 
 
-cross = np.array([[0, 1, 0],
-                  [1, 1, 1],
-                  [0, 1, 0]])
+def load_models():
+    f_model = "pretrained/{}/{}_best.json"
+    f_weights = "pretrained/{}/{}_best.h5"
+    dataset = "DRIVE"
+    models = []
+    for i in range(len(methods)):
+        # load the model and weights
+        with open(f_model.format(dataset, methods[i]), 'r') as f:
+            model = model_from_json(f.read())
+        model.load_weights(f_weights.format(dataset, methods[i]))
+        generated = model.predict(np.zeros((1, img_size[0], img_size[1], 3)), batch_size=1)
+        models.append(model)
+    return models
 
-# Flow:
-# ask for image
-# make segmentation with the three models
-# output results with matplotlib
-models = []
-for i in range(len(methods)):
-    # load the model and weights
-    with open(f_model.format(dataset, methods[i]), 'r') as f:
-        model = model_from_json(f.read())
-    model.load_weights(f_weights.format(dataset, methods[i]))
-    models.append(model)
+def main():
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# prevents an empty tkinter window from appearing
-root = tk.Tk()
-root.withdraw()
+    show_titles = True
+    rotate_by = 0
+    query_ground_truth = True
+    _cmap = "gray"
 
-segmentations = dict()  # dict where all segmentations for one run will be stored
-# first plot
-figs, axs = plt.subplots(2, len(methods) + (1 * query_ground_truth), sharex=True, sharey=True)
-for ax_s in axs:
-    for ax in ax_s:
-        ax.set_yticklabels([])
-        ax.set_xticklabels([])
-        ax.set_xticks([])
-        ax.set_yticks([])
-image_path = filedialog.askopenfilename()
+    custom_color_false_positive = (197, 27, 125)
+    custom_color_false_negative = (77, 146, 33)
+    custom_color_true_positive = (0, 0, 0)#(255, 255, 255)
+    background_color = (255, 255, 255)#(0, 0, 0)
 
-img = Image.open(image_path)
-if rotate_by > 0:
-    img = img.rotate(rotate_by)
-img = np.asarray(img).astype(np.float32)
-# set test dataset
-test_imgs = resize(img, img_size)[None, :, :, :]
-mean = np.mean(test_imgs[test_imgs[..., 0] > 40.0], axis=0, dtype=np.float32)
-std = np.std(test_imgs[test_imgs[..., 0] > 40.0], axis=0, dtype=np.float32)
-assert len(mean) == 3 and len(std) == 3
-orig_imgs = np.asarray(test_imgs) / 255
-orig_copy = np.copy(orig_imgs)
-test_imgs[0, ...] = (test_imgs[0, ...] - mean) / std
+    titles = ['Original GAN','GrowingGAN (10R)', 'GrowingGAN (10,4,4,4R)', 'GrowingGAN (5R)']
 
-ground_truth_path = image_path.replace("images", "1st_manual").replace("_test", "_manual1")
-if "DRIVE" in ground_truth_path:
-    ground_truth_path = ground_truth_path.replace(".tif", ".gif")
-else:
-    ground_truth_path = ground_truth_path.replace(".ppm", ".ah.ppm")
-ground_truth_img = Image.open(ground_truth_path)
-if rotate_by > 0:
-    ground_truth_img = ground_truth_img.rotate(rotate_by)
-ground_truth_img = np.asarray(ground_truth_img).astype(np.float32) / 255
-ground_truth_img = resize(ground_truth_img, img_size)
-segmentations['ground_truth_img'] = ground_truth_img
-axs[0, 0].imshow(ground_truth_img, cmap=_cmap)
+    batch_size = 1
 
-axs[1, 0].imshow(remain_in_mask(orig_imgs[0], multi_dilation(ground_truth_img, cross, 4)), cmap=_cmap)
-if show_titles:
-    axs[0, 0].set_title("Ground truth")
+    cross = np.array([[0, 1, 0],
+                      [1, 1, 1],
+                      [0, 1, 0]])
 
-for i in range(len(methods)):
-    generated = models[i].predict(test_imgs, batch_size=batch_size)
-    generated = np.squeeze(generated, axis=3)[0]
-    segmentations[methods[i]] = generated
-    axs[0, i + (1 * query_ground_truth)].imshow(generated, cmap=_cmap)
-    orig_imgs = np.copy(orig_copy)
-    axs[1, i + (1 * query_ground_truth)].imshow(remain_in_mask(orig_imgs[0], multi_dilation(generated, cross, 4)),
-                                                cmap=_cmap)
+    # Flow:
+    # ask for image
+    # make segmentation with the three models
+    # output results with matplotlib
+    models = load_models()
 
-    if show_titles:
-        axs[0, i + (1 * query_ground_truth)].set_title(titles[i])
-plt.tight_layout()
-plt.show()
+    def open_file_dialog():
+        image_path = filedialog.askopenfilename(title="Choose a Fundus Image")
+        if not image_path:
+            return
+        # prevents an empty tkinter window from appearing
+        root = tk.Tk()
+        root.withdraw()
+        root.title("")
 
-# second plot
-figs, axs = plt.subplots(1, len(methods) + (1 * query_ground_truth), sharex=True, sharey=True)
+        segmentations = dict()  # dict where all segmentations for one run will be stored
+        # first plot
+        figs, axs = plt.subplots(3, len(methods) + (1 * query_ground_truth), sharex=True, sharey=True)
+        for ax_s in axs:
+            for ax in ax_s:
+                ax.set_yticklabels([])
+                ax.set_xticklabels([])
+                ax.set_xticks([])
+                ax.set_yticks([])
 
-for ax_s in axs:
-    # for ax in ax_s:
-    ax_s.set_yticklabels([])
-    ax_s.set_xticklabels([])
-    ax_s.set_xticks([])
-    ax_s.set_yticks([])
 
-if query_ground_truth:
+        img = Image.open(image_path)
+        if rotate_by > 0:
+            img = img.rotate(rotate_by)
+        img = np.asarray(img).astype(np.float32)
+        # set test dataset
+        test_imgs = resize(img, img_size)[None, :, :, :]
+        mean = np.mean(test_imgs[test_imgs[..., 0] > 40.0], axis=0, dtype=np.float32)
+        std = np.std(test_imgs[test_imgs[..., 0] > 40.0], axis=0, dtype=np.float32)
+        assert len(mean) == 3 and len(std) == 3
+        orig_imgs = np.asarray(test_imgs) / 255
+        orig_copy = np.copy(orig_imgs)
+        test_imgs[0, ...] = (test_imgs[0, ...] - mean) / std
 
-    axs[0].imshow(ground_truth_img, cmap='gray_r')
-    if show_titles:
-        axs[0].set_title("Ground truth")
-for i in range(len(methods)):
+        ground_truth_path = image_path.replace("images", "1st_manual").replace("_test", "_manual1")
+        if "DRIVE" in ground_truth_path:
+            ground_truth_path = ground_truth_path.replace(".tif", ".gif")
+        else:
+            ground_truth_path = ground_truth_path.replace(".ppm", ".ah.ppm")
+        ground_truth_img = Image.open(ground_truth_path)
+        if rotate_by > 0:
+            ground_truth_img = ground_truth_img.rotate(rotate_by)
+        ground_truth_img = np.asarray(ground_truth_img).astype(np.float32) / 255
+        ground_truth_img = resize(ground_truth_img, img_size)
+        segmentations['ground_truth_img'] = ground_truth_img
+        axs[0, 0].imshow(ground_truth_img, cmap=_cmap)
+        axs[2, 0].imshow(ground_truth_img, cmap='gray_r')
+        if show_titles:
+            axs[2,0].set_title("Ground truth")
 
-    fake = segmentations[methods[i]].copy()
-    grd = segmentations['ground_truth_img'].copy()
-    _output = grd - fake
+        # Uncomment to create the image of the poster, with fundus image, segmentation and overlay
+        #create_img_fundus_segmentation_overlay(orig_imgs[0], _cmap, ground_truth_img, cross)
 
-    diff_img = np.zeros((_output.shape[0], _output.shape[1], 3), dtype=int)
-    _output[np.logical_and(_output > 0, _output < 0.1)] = 0
-    _output[np.logical_and(_output < 0, _output > -0.1)] = 0
-    aux = Image.fromarray(_output)
+        axs[1, 0].imshow(remain_in_mask(orig_imgs[0], multi_dilation(ground_truth_img, cross, 4)), cmap=_cmap)
+        if show_titles:
+            axs[0, 0].set_title("Ground truth")
 
-    """
-    diff_img[_output < 0, :] = np.transpose((custom_color_false_positive[0] * abs(_output[_output < 0]),
-                                             custom_color_false_positive[1] * abs(_output[_output < 0]),
-                                             custom_color_false_positive[2] * abs(_output[_output < 0])))
-    """
-    diff_img[_output < 0, :] = np.transpose(
-        apply_colors(custom_color_false_positive, background_color, abs(_output[_output < 0])))
+        for i in range(len(methods)):
+            generated = models[i].predict(test_imgs, batch_size=batch_size)
+            generated = np.squeeze(generated, axis=3)[0]
+            segmentations[methods[i]] = generated
+            axs[0, i + (1 * query_ground_truth)].imshow(generated, cmap=_cmap)
+            orig_imgs = np.copy(orig_copy)
+            axs[1, i + (1 * query_ground_truth)].imshow(remain_in_mask(orig_imgs[0], multi_dilation(generated, cross, 4)),
+                                                        cmap=_cmap)
 
-    """
-    diff_img[_output > 0, :] = np.transpose((custom_color_false_negative[0] * _output[_output > 0],
-                                             custom_color_false_negative[1] * _output[_output > 0],
-                                             custom_color_false_negative[2] * _output[_output > 0]))
-    """
-    diff_img[_output > 0, :] = np.transpose(
-        apply_colors(custom_color_false_negative, background_color, abs(_output[_output > 0])))
+            if show_titles:
+                axs[0, i + (1 * query_ground_truth)].set_title(titles[i])
 
-    diff_img[np.logical_and(_output == 0, grd > 0.1), :] = custom_color_true_positive
-    diff_img[np.logical_and(_output == 0, grd <= 0.1), :] = background_color
+            fake = segmentations[methods[i]].copy()
+            grd = segmentations['ground_truth_img'].copy()
+            _output = grd - fake
 
-    orig_imgs = np.copy(orig_copy)
-    axs[i + (1 * query_ground_truth)].set_facecolor('white')
+            diff_img = np.zeros((_output.shape[0], _output.shape[1], 3), dtype=int)
+            _output[np.logical_and(_output > 0, _output < 0.1)] = 0
+            _output[np.logical_and(_output < 0, _output > -0.1)] = 0
 
-    axs[i + (1 * query_ground_truth)].imshow(diff_img)
+            diff_img[_output < 0, :] = np.transpose(
+                apply_colors(custom_color_false_positive, background_color, abs(_output[_output < 0])))
 
-    if show_titles:
-        axs[i + (1 * query_ground_truth)].set_title(f"Ground truth VS {titles[i]}")
-plt.tight_layout()
-plt.show()
+            diff_img[_output > 0, :] = np.transpose(
+                apply_colors(custom_color_false_negative, background_color, abs(_output[_output > 0])))
+
+            diff_img[np.logical_and(_output == 0, grd > 0.1), :] = custom_color_true_positive
+            diff_img[np.logical_and(_output == 0, grd <= 0.1), :] = background_color
+
+            axs[2, i + (1 * query_ground_truth)].set_facecolor('white')
+
+            axs[2, i + (1 * query_ground_truth)].imshow(diff_img)
+
+            if show_titles:
+                axs[2, i + (1 * query_ground_truth)].set_title(f"Ground truth VS {titles[i]}")
+        plt.tight_layout()
+        manager = plt.get_current_fig_manager()
+        manager.full_screen_toggle()
+        plt.show()
+
+
+        root.mainloop()
+        return
+
+    app = tk.Tk()
+    app.title("Vizualization Demo for Growing GAN of Retinal Vessel Segmentation")
+
+    open_button = tk.Button(app, text="Choose Fundus Image", command=open_file_dialog)
+    open_button.pack()
+
+    app.mainloop()
+    return
+
+
+if __name__ == "__main__":
+    main()
