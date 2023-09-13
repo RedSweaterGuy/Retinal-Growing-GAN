@@ -3,13 +3,11 @@ import os
 import json
 import glob
 from json import JSONEncoder
-from keras.models import model_from_json
 from PIL import Image
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
-from skimage.transform import resize
-from skimage.morphology import dilation
+
 
 methods = ['origGANnew', 'GrowConst10', 'growGANvarying', 'growGANconstant']
 img_size = (640, 640)
@@ -100,6 +98,10 @@ def main():
     # make segmentation with the three models
     # output results with matplotlib
     generate_with_models = False
+    if generate_with_models:
+        from keras.models import model_from_json
+        from skimage.transform import resize
+        from skimage.morphology import dilation
     generate_for_all = generate_with_models and False
     models = load_models() if generate_with_models else None
 
@@ -194,10 +196,6 @@ def main():
         image_path = filedialog.askopenfilename(title="Choose a Fundus Image")
         if not image_path:
             return
-        # prevents an empty tkinter window from appearing
-        root = tk.Tk()
-        root.withdraw()
-        root.title("")
 
         # first plot
         figs, axs = plt.subplots(3, len(methods) + (1 * query_ground_truth), sharex=True, sharey=True)
@@ -238,18 +236,16 @@ def main():
             axs[2, i + (1 * query_ground_truth)].imshow(diff_imgs[methods[i]])
 
             if show_titles:
-                axs[2, i + (1 * query_ground_truth)].set_title(f"Ground truth VS {titles[i]}")
+                axs[2, i + (1 * query_ground_truth)].set_title(f"GT VS {titles[i]}")
         plt.tight_layout()
         manager = plt.get_current_fig_manager()
         manager.full_screen_toggle()
         plt.show()
-
-
-        root.mainloop()
         return
 
     app = tk.Tk()
     app.title("Vizualization Demo for Growing GAN of Retinal Vessel Segmentation")
+    app.geometry("600x100")
 
     open_button = tk.Button(app, text="Choose Fundus Image", command=open_file_dialog)
     open_button.pack()
